@@ -6,6 +6,9 @@ Alligator is a smart DeFi lending rate aggregator built on Avalanche that helps 
 
 - **Real-time APY Comparison**: Compare lending and borrowing rates across multiple DeFi protocols
 - **Smart Protocol Selection**: Automatically routes transactions to the protocol with the best rates
+- **Live Portfolio Tracking**: Monitor all your DeFi positions across protocols in real-time
+- **User Balance Integration**: See wallet balances and transaction limits
+- **Health Factor Monitoring**: Track liquidation risk and portfolio health
 - **Web3 Integration**: Full wallet connectivity with RainbowKit and Wagmi
 - **Avalanche Native**: Built specifically for the Avalanche ecosystem
 - **User-Friendly Interface**: Clean, modern UI with real-time data updates

@@ -5,16 +5,8 @@ import Header from '../components/Header';
 import BestRates from '../components/BestRates';
 import LendingForm from '../components/LendingForm';
 import ContractInfo from '../components/ContractInfo';
+import Portfolio from '../components/Portfolio';
 import { BarChart3, TrendingUp, Wallet, PieChart } from 'lucide-react';
-
-// Import placeholder components for now - we'll create these
-const Dashboard = BestRates; // Use BestRates as Dashboard for now
-const APYComparisonTable = BestRates; // Use BestRates as APYComparisonTable for now
-const Portfolio = ContractInfo; // Use ContractInfo for now
-const TradingModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => null; // Placeholder
-const ContractTest = ContractInfo; // Use ContractInfo as ContractTest for now
-const ContractSetup = ContractInfo; // Use ContractInfo as ContractSetup for now
-const WalletInfo = ContractInfo; // Use ContractInfo as WalletInfo for now
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'markets' | 'portfolio'>('dashboard');
@@ -297,63 +289,7 @@ export default function Home() {
 
         {activeTab === 'portfolio' && (
           <div className="space-y-8">
-            {/* Portfolio Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-green-600 text-sm font-medium">Total Supplied</p>
-                    <p className="text-2xl font-bold text-green-800">$0.00</p>
-                    <p className="text-xs text-green-600 mt-1">Connect wallet</p>
-                  </div>
-                  <div className="text-3xl">💰</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-100 border border-blue-200 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-600 text-sm font-medium">Total Borrowed</p>
-                    <p className="text-2xl font-bold text-blue-800">$0.00</p>
-                    <p className="text-xs text-blue-600 mt-1">Connect wallet</p>
-                  </div>
-                  <div className="text-3xl">📊</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-50 to-pink-100 border border-purple-200 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-600 text-sm font-medium">Net APY</p>
-                    <p className="text-2xl font-bold text-purple-800">0.0%</p>
-                    <p className="text-xs text-purple-600 mt-1">Connect wallet</p>
-                  </div>
-                  <div className="text-3xl">📈</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Portfolio Overview */}
-            <div>
-              <ContractInfo />
-            </div>
-
-            {/* Additional Portfolio Components */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                📊 Your Portfolio
-                <span className="text-sm font-normal text-gray-500">(Coming Soon)</span>
-              </h3>
-              <div className="text-center py-8">
-                <div className="text-6xl mb-4">🚀</div>
-                <p className="text-gray-600 mb-4">Connect your wallet to view your DeFi positions and earnings.</p>
-                <div className="flex justify-center gap-4 text-sm">
-                  <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Real-time Tracking</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full">Yield Analytics</span>
-                  <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full">Risk Assessment</span>
-                </div>
-              </div>
-            </div>
+            <Portfolio />
           </div>
         )}
         </main>

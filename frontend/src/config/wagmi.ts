@@ -109,11 +109,68 @@ export const LENDING_APY_AGGREGATOR_ABI = [
     "inputs": [
       {"internalType": "address", "name": "asset", "type": "address"},
       {"internalType": "uint256", "name": "amount", "type": "uint256"},
+      {"internalType": "enum LendingAPYAggregator.Protocol", "name": "protocol", "type": "uint8"}
+    ],
+    "name": "borrow",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "asset", "type": "address"},
+      {"internalType": "uint256", "name": "amount", "type": "uint256"},
       {"internalType": "uint256", "name": "minExpectedAPY", "type": "uint256"}
     ],
     "name": "supplyToBestRate",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "asset", "type": "address"},
+      {"internalType": "uint256", "name": "amount", "type": "uint256"},
+      {"internalType": "uint256", "name": "maxExpectedAPY", "type": "uint256"}
+    ],
+    "name": "borrowFromBestRate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "user", "type": "address"},
+      {"internalType": "address", "name": "asset", "type": "address"}
+    ],
+    "name": "getUserPosition",
+    "outputs": [
+      {
+        "components": [
+          {"internalType": "uint256", "name": "supplied", "type": "uint256"},
+          {"internalType": "uint256", "name": "borrowed", "type": "uint256"},
+          {"internalType": "enum LendingAPYAggregator.Protocol", "name": "protocol", "type": "uint8"},
+          {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "internalType": "struct LendingAPYAggregator.UserPosition",
+        "name": "position",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "user", "type": "address"},
+      {"internalType": "address[]", "name": "assets", "type": "address[]"}
+    ],
+    "name": "getUserPortfolio",
+    "outputs": [
+      {"internalType": "uint256", "name": "totalSupplied", "type": "uint256"},
+      {"internalType": "uint256", "name": "totalBorrowed", "type": "uint256"}
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const;

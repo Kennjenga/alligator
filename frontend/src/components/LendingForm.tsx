@@ -1,22 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits } from 'viem';
-import { avalancheFuji } from 'wagmi/chains';
-import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES, LENDING_APY_AGGREGATOR_ABI } from '../config/wagmi';
+import { useAccount } from 'wagmi';
+import { useSupplyTransaction, useBorrowTransaction, useTokenBalance } from '../hooks/useTransactions';
+import { useProtocolAPYs } from '../hooks/useProtocolData';
+import { TOKEN_ADDRESSES } from '../config/wagmi';
 
 const LendingForm: React.FC = () => {
-  const [selectedToken, setSelectedToken] = useState('USDC');
+  const [selectedToken, setSelectedToken] = useState<keyof typeof TOKEN_ADDRESSES>('USDC');
   const [amount, setAmount] = useState('');
   const [action, setAction] = useState<'supply' | 'borrow'>('supply');
-  const [isLoading, setIsLoading] = useState(false);
 
-  const { isConnected, address: userAddress } = useAccount();
-  const { writeContract, data: hash } = useWriteContract();
+  const { isConnected } = useAccount();
+  const { supply, isLoading: isSupplying, isConfirming: isSupplyConfirming, isSuccess: isSupplySuccess, error: supplyError } = useSupplyTransaction();
+  const { borrow, isLoading: isBorrowing, isConfirming: isBorrowConfirming, isSuccess: isBorrowSuccess, error: borrowError } = useBorrowTransaction();
+  const { balance, refetch: refetchBalance } = useTokenBalance(selectedToken);
+  const { bestSupply, bestBorrow } = useProtocolAPYs(selectedToken);
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({ hash });
+  const isLoading = isSupplying || isBorrowing;
+  const isConfirming = isSupplyConfirming || isBorrowConfirming;
+  const isSuccess = isSupplySuccess || isBorrowSuccess;
+  const error = supplyError || borrowError;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,28 +35,32 @@ const LendingForm: React.FC = () => {
       return;
     }
 
+    // Check if user has enough balance for supply
+    if (action === 'supply' && parseFloat(amount) > parseFloat(balance)) {
+      alert('Insufficient balance');
+      return;
+    }
+
     try {
-      setIsLoading(true);
-
-      const tokenAddress = TOKEN_ADDRESSES[selectedToken as keyof typeof TOKEN_ADDRESSES];
-      const amountWei = parseUnits(amount, 6); // Assuming 6 decimals for USDC/USDT
-
       if (action === 'supply') {
-        // Use supplyToBestRate to automatically find the best protocol
-        writeContract({
-          address: CONTRACT_ADDRESSES.LendingAPYAggregator as `0x${string}`,
-          abi: LENDING_APY_AGGREGATOR_ABI,
-          functionName: 'supplyToBestRate',
-          args: [tokenAddress, amountWei, BigInt(0)], // 0 minimum APY for demo
-          chain: avalancheFuji,
-          account: userAddress,
-        });
+        await supply(selectedToken, amount); // Uses best rate automatically
+      } else {
+        await borrow(selectedToken, amount); // Uses best rate automatically
       }
+
+      // Refresh balance after successful transaction
+      setTimeout(() => {
+        refetchBalance();
+      }, 2000);
+
     } catch (error) {
       console.error('Transaction failed:', error);
-      alert('Transaction failed. Please try again.');
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const handleMaxClick = () => {
+    if (action === 'supply') {
+      setAmount(balance);
     }
   };
 
@@ -122,7 +130,7 @@ const LendingForm: React.FC = () => {
               <select
                 id="token"
                 value={selectedToken}
-                onChange={(e) => setSelectedToken(e.target.value)}
+                onChange={(e) => setSelectedToken(e.target.value as keyof typeof TOKEN_ADDRESSES)}
                 className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none cursor-pointer hover:border-gray-300 text-lg font-medium"
               >
                 <option value="USDC">💵 USDC</option>
@@ -158,8 +166,12 @@ const LendingForm: React.FC = () => {
             </div>
           </div>
           <div className="flex justify-between text-sm text-gray-500">
-            <span>Balance: 0.00 {selectedToken}</span>
-            <button type="button" className="text-blue-600 hover:text-blue-700 font-bold transition-colors">
+            <span>Balance: {parseFloat(balance).toFixed(4)} {selectedToken}</span>
+            <button
+              type="button"
+              onClick={handleMaxClick}
+              className="text-blue-600 hover:text-blue-700 font-bold transition-colors"
+            >
               Max
             </button>
           </div>
@@ -169,14 +181,38 @@ const LendingForm: React.FC = () => {
           <div className="relative bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6">
             <div className="flex items-start gap-4">
               <div className="text-3xl">✨</div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-xl font-bold text-blue-800 mb-3">
                   Smart Protocol Selection
                 </h3>
-                <p className="text-blue-700 leading-relaxed">
+                <p className="text-blue-700 leading-relaxed mb-4">
                   Our smart contract automatically finds the best {action === 'supply' ? 'lending' : 'borrowing'} rate
                   across all supported protocols and executes your transaction there for maximum efficiency.
                 </p>
+
+                {action === 'supply' && bestSupply && (
+                  <div className="bg-white/50 rounded-lg p-3 border border-blue-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-blue-800">Best Supply Rate:</span>
+                      <div className="text-right">
+                        <div className="font-bold text-green-600">{bestSupply.supplyAPY.toFixed(2)}%</div>
+                        <div className="text-xs text-blue-600">{bestSupply.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {action === 'borrow' && bestBorrow && bestBorrow.borrowAPY > 0 && (
+                  <div className="bg-white/50 rounded-lg p-3 border border-blue-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-blue-800">Best Borrow Rate:</span>
+                      <div className="text-right">
+                        <div className="font-bold text-blue-600">{bestBorrow.borrowAPY.toFixed(2)}%</div>
+                        <div className="text-xs text-blue-600">{bestBorrow.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -218,14 +254,32 @@ const LendingForm: React.FC = () => {
           )}
         </button>
 
-        {isConfirmed && (
+        {isSuccess && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="text-2xl">🎉</div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold text-green-800">Transaction Successful!</h3>
-                <p className="text-green-700 text-sm">
-                  Your {action} transaction has been confirmed.
+                <p className="text-green-700 text-sm mb-2">
+                  Your {action} of {amount} {selectedToken} has been confirmed and routed to the best protocol.
+                </p>
+                <div className="text-xs text-green-600">
+                  Protocol: {action === 'supply' ? bestSupply?.name : bestBorrow?.name} •
+                  Rate: {action === 'supply' ? bestSupply?.supplyAPY.toFixed(2) : bestBorrow?.borrowAPY.toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">❌</div>
+              <div>
+                <h3 className="font-semibold text-red-800">Transaction Failed</h3>
+                <p className="text-red-700 text-sm">
+                  {error}
                 </p>
               </div>
             </div>
