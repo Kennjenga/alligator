@@ -30,8 +30,12 @@ const Header: React.FC = () => {
                 </span>
               </div>
             )}
-            <div className="transform hover:scale-105 transition-transform duration-200">
-              <ConnectButton />
+            <div className="transform hover:scale-105 transition-transform duration-200 z-50">
+              <ConnectButton
+                showBalance={false}
+                chainStatus="icon"
+                accountStatus="avatar"
+              />
             </div>
           </div>
         </div>

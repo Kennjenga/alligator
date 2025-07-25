@@ -6,7 +6,7 @@ import { useSupplyTransaction } from '../hooks/useTransactions';
 
 const BestRates: React.FC = () => {
   const [selectedToken, setSelectedToken] = useState<'USDC' | 'USDT' | 'WAVAX'>('USDC');
-  const { rates, bestSupply, bestBorrow, isLoading, isError, refetch, isUsingMockData } = useProtocolAPYs(selectedToken);
+  const { rates, bestSupply, bestBorrow, isLoading, refetch, isUsingMockData } = useProtocolAPYs(selectedToken);
   const { supply, isLoading: isSupplying } = useSupplyTransaction();
 
   const handleSupply = async (protocolIndex: number) => {
@@ -66,9 +66,9 @@ const BestRates: React.FC = () => {
                 </div>
                 <h3 className="text-2xl font-bold text-emerald-800 mb-3">Best Supply Rate</h3>
                 <div className="text-5xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent mb-3 tracking-tight">
-                  {bestSupply.supplyAPY.toFixed(2)}%
+                  {bestSupply ? bestSupply.supplyAPY.toFixed(2) : '0.00'}%
                 </div>
-                <p className="text-emerald-700 font-semibold text-lg mb-4">{bestSupply.name}</p>
+                <p className="text-emerald-700 font-semibold text-lg mb-4">{bestSupply?.name || 'No data'}</p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-sm font-bold shadow-md">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                   🚀 Highest APY
@@ -88,7 +88,7 @@ const BestRates: React.FC = () => {
                   </svg>
                 </div>
                 <h3 className="text-2xl font-bold text-blue-800 mb-3">Best Borrow Rate</h3>
-                {bestBorrow.borrowAPY > 0 ? (
+                {bestBorrow && bestBorrow.borrowAPY > 0 ? (
                   <>
                     <div className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3 tracking-tight">
                       {bestBorrow.borrowAPY.toFixed(2)}%
@@ -157,12 +157,12 @@ const BestRates: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="font-medium text-gray-900">{rate.name}</div>
-                        {rate.protocol === bestSupply.protocol && (
+                        {bestSupply && rate.protocol === bestSupply.protocol && (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                             Best Supply
                           </span>
                         )}
-                        {rate.protocol === bestBorrow.protocol && rate.borrowAPY > 0 && (
+                        {bestBorrow && rate.protocol === bestBorrow.protocol && rate.borrowAPY > 0 && (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Best Borrow
                           </span>

@@ -15,7 +15,7 @@ if (!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
 // Wallet configuration with Core Wallet support
 export const config = getDefaultConfig({
   appName: 'Alligator',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
   wallets: [
     {
       groupName: "Popular Wallets",
@@ -42,13 +42,18 @@ export const config = getDefaultConfig({
   storage: createStorage({
     storage: cookieStorage,
   }),
+  batch: {
+    multicall: true,
+  },
 });
 
 // Contract addresses
 export const CONTRACT_ADDRESSES = {
-  LendingAPYAggregator: "0x742d35Cc6634C0532925a3b8D4C9db96C4b5Da5e", // Deployed on Fuji testnet
+  LendingAPYAggregator: "0x742d35Cc6634C0532925a3b8D4C9db96C4b5Da5e", // Deployed contract
+  DEXIntegration: "0x742d35Cc6634C0532925a3b8D4C9db96C4b5Da5e", // Using same address for now
   AavePool: "0x1775ECC8362dB6CaB0c7A9C0957cF656A5276c29",
   BenqiComptroller: "0x486Af39519B4Dc9a7fCcd318217352830E8AD9b4",
+  TraderJoeRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4", // Trader Joe Router on Fuji
 } as const;
 
 // Token addresses on Fuji
@@ -169,6 +174,129 @@ export const LENDING_APY_AGGREGATOR_ABI = [
     "outputs": [
       {"internalType": "uint256", "name": "totalSupplied", "type": "uint256"},
       {"internalType": "uint256", "name": "totalBorrowed", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "user", "type": "address"},
+      {"internalType": "address", "name": "asset", "type": "address"},
+      {"internalType": "uint256", "name": "amount", "type": "uint256"}
+    ],
+    "name": "checkBalance",
+    "outputs": [
+      {"internalType": "bool", "name": "hasBalance", "type": "bool"},
+      {"internalType": "uint256", "name": "availableBalance", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "asset", "type": "address"},
+      {"internalType": "uint256", "name": "minAmountOut", "type": "uint256"},
+      {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+    ],
+    "name": "purchaseAssetWithAVAX",
+    "outputs": [
+      {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "asset", "type": "address"},
+      {"internalType": "uint256", "name": "amount", "type": "uint256"},
+      {"internalType": "uint8", "name": "protocol", "type": "uint8"},
+      {"internalType": "bool", "name": "purchaseWithAVAX", "type": "bool"},
+      {"internalType": "uint256", "name": "maxSlippage", "type": "uint256"},
+      {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+    ],
+    "name": "supplyWithAutoPurchase",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  }
+] as const;
+
+// DEX Integration ABI
+export const DEX_INTEGRATION_ABI = [
+  {
+    "inputs": [
+      {"internalType": "address", "name": "tokenOut", "type": "address"},
+      {"internalType": "uint256", "name": "amountOutMin", "type": "uint256"},
+      {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+    ],
+    "name": "buyTokenWithAVAX",
+    "outputs": [
+      {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "tokenOut", "type": "address"},
+      {"internalType": "uint256", "name": "amountIn", "type": "uint256"}
+    ],
+    "name": "getQuoteBuyWithAVAX",
+    "outputs": [
+      {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
+    ],
+    "name": "calculateMinAmountOut",
+    "outputs": [
+      {"internalType": "uint256", "name": "minAmountOut", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+// Trader Joe Router ABI (simplified for swapping)
+export const TRADER_JOE_ROUTER_ABI = [
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "amountOutMin", "type": "uint256"},
+      {"internalType": "address[]", "name": "path", "type": "address[]"},
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+    ],
+    "name": "swapExactAVAXForTokens",
+    "outputs": [
+      {"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "amountIn", "type": "uint256"},
+      {"internalType": "address[]", "name": "path", "type": "address[]"}
+    ],
+    "name": "getAmountsOut",
+    "outputs": [
+      {"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "amountOut", "type": "uint256"},
+      {"internalType": "address[]", "name": "path", "type": "address[]"}
+    ],
+    "name": "getAmountsIn",
+    "outputs": [
+      {"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}
     ],
     "stateMutability": "view",
     "type": "function"

@@ -3,6 +3,7 @@
 import { useReadContract, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES, LENDING_APY_AGGREGATOR_ABI } from '../config/wagmi';
 import { useMemo } from 'react';
+import { useRealProtocolAPYs } from './useRealProtocolData';
 
 export interface ProtocolAPY {
   name: string;
@@ -37,64 +38,8 @@ export interface UserPortfolio {
 }
 
 export function useProtocolAPYs(asset: keyof typeof TOKEN_ADDRESSES = 'USDC') {
-  const tokenAddress = TOKEN_ADDRESSES[asset];
-  
-  const { data: contractRates, isError, isLoading, refetch } = useReadContract({
-    address: CONTRACT_ADDRESSES.LendingAPYAggregator as `0x${string}`,
-    abi: LENDING_APY_AGGREGATOR_ABI,
-    functionName: 'getAllAPYs',
-    args: [tokenAddress],
-    query: {
-      refetchInterval: 30000, // Refetch every 30 seconds
-      staleTime: 15000, // Consider data stale after 15 seconds
-    }
-  });
-
-  const protocolNames = ['AAVE V3', 'Morpho', 'BENQI', 'Yield Yak'];
-
-  const rates = useMemo(() => {
-    if (isError || !contractRates) {
-      // Fallback mock data with realistic values
-      return [
-        { name: 'AAVE V3', supplyAPY: 5.2, borrowAPY: 7.8, protocol: 0, tvl: 1200000, utilization: 75 },
-        { name: 'Morpho', supplyAPY: 6.1, borrowAPY: 7.5, protocol: 1, tvl: 800000, utilization: 68 },
-        { name: 'BENQI', supplyAPY: 5.8, borrowAPY: 8.2, protocol: 2, tvl: 950000, utilization: 72 },
-        { name: 'Yield Yak', supplyAPY: 9.2, borrowAPY: 0, protocol: 3, tvl: 450000, utilization: 85 },
-      ];
-    }
-
-    return contractRates.map((rate: any, index: number) => ({
-      name: protocolNames[rate.protocol] || `Protocol ${rate.protocol}`,
-      supplyAPY: Number(rate.supplyAPY) / 1e25, // Convert from ray to percentage
-      borrowAPY: Number(rate.borrowAPY) / 1e25, // Convert from ray to percentage
-      protocol: Number(rate.protocol),
-      tvl: Math.random() * 2000000 + 500000, // Mock TVL data
-      utilization: Math.random() * 30 + 60, // Mock utilization data
-    }));
-  }, [contractRates, isError]);
-
-  const bestSupply = useMemo(() => 
-    rates.reduce((best, current) => 
-      current.supplyAPY > best.supplyAPY ? current : best
-    ), [rates]);
-
-  const bestBorrow = useMemo(() => 
-    rates.reduce((best, current) => {
-      if (current.borrowAPY > 0 && (best.borrowAPY === 0 || current.borrowAPY < best.borrowAPY)) {
-        return current;
-      }
-      return best;
-    }), [rates]);
-
-  return {
-    rates,
-    bestSupply,
-    bestBorrow,
-    isLoading,
-    isError,
-    refetch,
-    isUsingMockData: isError || !contractRates
-  };
+  // Use real protocol data instead of contract calls
+  return useRealProtocolAPYs(asset);
 }
 
 export function useBestSupplyAPY(asset: keyof typeof TOKEN_ADDRESSES = 'USDC') {

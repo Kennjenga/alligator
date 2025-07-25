@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useSupplyTransaction, useBorrowTransaction, useTokenBalance } from '../hooks/useTransactions';
 import { useProtocolAPYs } from '../hooks/useProtocolData';
+import { useInsufficientBalanceHelper, useSupplyWithAutoPurchase } from '../hooks/useDEXIntegration';
 import { TOKEN_ADDRESSES } from '../config/wagmi';
 
 const LendingForm: React.FC = () => {
@@ -17,8 +18,12 @@ const LendingForm: React.FC = () => {
   const { balance, refetch: refetchBalance } = useTokenBalance(selectedToken);
   const { bestSupply, bestBorrow } = useProtocolAPYs(selectedToken);
 
-  const isLoading = isSupplying || isBorrowing;
-  const isConfirming = isSupplyConfirming || isBorrowConfirming;
+  // DEX integration hooks
+  const { hasBalance, shortfall, needsPurchase, avaxRequired } = useInsufficientBalanceHelper(selectedToken, amount);
+  const { supplyWithAutoPurchase, isLoading: isAutoSupplying, isConfirming: isAutoSupplyConfirming } = useSupplyWithAutoPurchase();
+
+  const isLoading = isSupplying || isBorrowing || isAutoSupplying;
+  const isConfirming = isSupplyConfirming || isBorrowConfirming || isAutoSupplyConfirming;
   const isSuccess = isSupplySuccess || isBorrowSuccess;
   const error = supplyError || borrowError;
 
@@ -35,14 +40,23 @@ const LendingForm: React.FC = () => {
       return;
     }
 
-    // Check if user has enough balance for supply
-    if (action === 'supply' && parseFloat(amount) > parseFloat(balance)) {
-      alert('Insufficient balance');
-      return;
-    }
-
     try {
       if (action === 'supply') {
+        // Check if user has enough balance for supply
+        if (!hasBalance && needsPurchase) {
+          // Show purchase option instead of error
+          const shouldPurchase = window.confirm(
+            `You need ${shortfall} ${selectedToken} but only have ${balance}. ` +
+            `Would you like to purchase the required amount with approximately ${avaxRequired} AVAX?`
+          );
+
+          if (shouldPurchase) {
+            // Use supply with auto-purchase
+            await supplyWithAutoPurchase(selectedToken, amount, bestSupply?.protocol || 0, avaxRequired);
+          }
+          return;
+        }
+
         await supply(selectedToken, amount); // Uses best rate automatically
       } else {
         await borrow(selectedToken, amount); // Uses best rate automatically
@@ -176,6 +190,43 @@ const LendingForm: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Insufficient Balance Warning */}
+        {action === 'supply' && needsPurchase && amount && parseFloat(amount) > 0 && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur-lg opacity-20"></div>
+            <div className="relative bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-2xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">⚠️</div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-orange-800 mb-3">
+                    Insufficient Balance
+                  </h3>
+                  <div className="space-y-2 text-orange-700">
+                    <p>
+                      <span className="font-semibold">Required:</span> {amount} {selectedToken}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Available:</span> {parseFloat(balance).toFixed(4)} {selectedToken}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Shortfall:</span> {shortfall} {selectedToken}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold">Estimated cost:</span> ~{parseFloat(avaxRequired).toFixed(4)} AVAX
+                    </p>
+                  </div>
+                  <div className="mt-4 p-3 bg-orange-100 rounded-lg">
+                    <p className="text-sm text-orange-800">
+                      💡 <strong>Auto-Purchase Available:</strong> When you click "Supply", you'll be prompted to purchase the required {selectedToken} with AVAX automatically.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur-lg opacity-20"></div>
           <div className="relative bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6">

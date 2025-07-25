@@ -10,6 +10,7 @@ import "./interfaces/IAave.sol";
 import "./interfaces/IMorpho.sol";
 import "./interfaces/IBenqi.sol";
 import "./interfaces/IYieldYak.sol";
+import "./DEXIntegration.sol";
 
 contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
     using SafeERC20 for IERC20;
@@ -19,6 +20,9 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
     IMorpho public morpho;
     IBenqi public benqi;
     IYieldYak public yieldYak;
+
+    // DEX integration for asset purchases
+    DEXIntegration public dexIntegration;
 
     // Constants
     uint256 public constant MAX_PROTOCOL_FEE = 1000; // 10% max fee
@@ -69,6 +73,8 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
     event EmergencyWithdraw(address indexed user, address indexed asset, uint256 amount);
     event FeesCollected(address indexed asset, uint256 amount);
     event ProtocolFeeUpdated(uint256 oldFee, uint256 newFee);
+    event AssetPurchased(address indexed user, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+    event InsufficientBalance(address indexed user, address indexed asset, uint256 required, uint256 available);
 
     // Modifiers
     modifier validAmount(address asset, uint256 amount) {
@@ -92,12 +98,14 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
         address _aave,
         address _morpho,
         address _benqi,
-        address _yieldYak
+        address _yieldYak,
+        address payable _dexIntegration
     ) Ownable(msg.sender) {
         aave = IAave(_aave);
         morpho = IMorpho(_morpho);
         benqi = IBenqi(_benqi);
         yieldYak = IYieldYak(_yieldYak);
+        dexIntegration = DEXIntegration(_dexIntegration);
         feeRecipient = msg.sender;
 
         // Initialize supported assets (can be updated later)
@@ -140,8 +148,8 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
             IERC20(asset).forceApprove(address(aave), amount);
             aave.supply(asset, amount, user, 0);
         } else if (protocol == Protocol.MORPHO) {
-            // Morpho integration would go here - for now skip
-            revert("Morpho not implemented");
+            IERC20(asset).forceApprove(address(morpho), amount);
+            morpho.supply(asset, amount, user, 10); // 10 iterations for matching
         } else if (protocol == Protocol.BENQI) {
             IERC20(asset).forceApprove(address(benqi), amount);
             benqi.mint(asset, amount);
@@ -165,7 +173,7 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
         if (protocol == Protocol.AAVE) {
             aave.borrow(asset, amount, 2, 0, msg.sender);
         } else if (protocol == Protocol.MORPHO) {
-            revert("Morpho not implemented");
+            morpho.borrow(asset, amount, 2, 10, msg.sender); // Variable rate, 10 iterations
         } else if (protocol == Protocol.BENQI) {
             benqi.borrow(asset, amount);
         }
@@ -193,7 +201,8 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
             IERC20(asset).forceApprove(address(aave), amount);
             aave.repay(asset, amount, 2, msg.sender);
         } else if (protocol == Protocol.MORPHO) {
-            revert("Morpho not implemented");
+            IERC20(asset).forceApprove(address(morpho), amount);
+            morpho.repay(asset, amount, 2, msg.sender); // Variable rate
         } else if (protocol == Protocol.BENQI) {
             IERC20(asset).forceApprove(address(benqi), amount);
             benqi.repayBorrow(asset, amount);
@@ -557,7 +566,7 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
         if (protocol == Protocol.AAVE) {
             aave.withdraw(asset, amount, user);
         } else if (protocol == Protocol.MORPHO) {
-            revert("Morpho not implemented");
+            morpho.withdraw(asset, amount, user, 10); // 10 iterations for matching
         } else if (protocol == Protocol.BENQI) {
             benqi.redeemUnderlying(asset, amount);
         } else if (protocol == Protocol.YIELDYAK) {
@@ -572,6 +581,155 @@ contract LendingAPYAggregator is ReentrancyGuard, Pausable, Ownable {
             }
         }
         return 0;
+    }
+
+    // ============ DEX INTEGRATION FUNCTIONS ============
+
+    /**
+     * @notice Check if user has sufficient balance for supply
+     * @param user User address
+     * @param asset Asset address
+     * @param amount Required amount
+     * @return hasBalance Whether user has sufficient balance
+     * @return availableBalance User's current balance
+     */
+    function checkBalance(address user, address asset, uint256 amount)
+        external
+        view
+        returns (bool hasBalance, uint256 availableBalance)
+    {
+        availableBalance = IERC20(asset).balanceOf(user);
+        hasBalance = availableBalance >= amount;
+    }
+
+    /**
+     * @notice Get quote for purchasing required asset with AVAX
+     * @param asset Asset to purchase
+     * @param amountOut Required amount of asset
+     * @return amountIn Amount of AVAX needed
+     */
+    function getQuotePurchaseWithAVAX(address asset, uint256 amountOut)
+        external
+        view
+        returns (uint256 amountIn)
+    {
+        return dexIntegration.getQuoteBuyWithToken(dexIntegration.WAVAX(), asset, amountOut);
+    }
+
+    /**
+     * @notice Get quote for purchasing required asset with another token
+     * @param tokenIn Token to sell
+     * @param tokenOut Token to purchase
+     * @param amountOut Required amount of output token
+     * @return amountIn Amount of input token needed
+     */
+    function getQuotePurchaseWithToken(address tokenIn, address tokenOut, uint256 amountOut)
+        external
+        view
+        returns (uint256 amountIn)
+    {
+        return dexIntegration.getQuoteBuyWithToken(tokenIn, tokenOut, amountOut);
+    }
+
+    /**
+     * @notice Purchase asset with AVAX when user has insufficient balance
+     * @param asset Asset to purchase
+     * @param minAmountOut Minimum amount of asset to receive
+     * @param deadline Transaction deadline
+     * @return amountOut Amount of asset received
+     */
+    function purchaseAssetWithAVAX(
+        address asset,
+        uint256 minAmountOut,
+        uint256 deadline
+    ) external payable nonReentrant returns (uint256 amountOut) {
+        require(supportedAssets[asset], "Asset not supported");
+        require(msg.value > 0, "No AVAX sent");
+
+        amountOut = dexIntegration.buyTokenWithAVAX{value: msg.value}(
+            asset,
+            minAmountOut,
+            deadline
+        );
+
+        emit AssetPurchased(msg.sender, dexIntegration.WAVAX(), asset, msg.value, amountOut);
+    }
+
+    /**
+     * @notice Purchase asset with another token when user has insufficient balance
+     * @param tokenIn Token to sell
+     * @param tokenOut Token to purchase
+     * @param amountIn Amount of input token
+     * @param minAmountOut Minimum amount of output token to receive
+     * @param deadline Transaction deadline
+     * @return amountOut Amount of output token received
+     */
+    function purchaseAssetWithToken(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline
+    ) external nonReentrant returns (uint256 amountOut) {
+        require(supportedAssets[tokenOut], "Asset not supported");
+        require(amountIn > 0, "Invalid amount");
+
+        // Transfer input tokens from user to this contract
+        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+
+        // Approve DEX integration to spend tokens
+        IERC20(tokenIn).forceApprove(address(dexIntegration), amountIn);
+
+        amountOut = dexIntegration.buyTokenWithToken(
+            tokenIn,
+            tokenOut,
+            amountIn,
+            minAmountOut,
+            deadline
+        );
+
+        emit AssetPurchased(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
+    }
+
+    /**
+     * @notice Supply with automatic asset purchase if insufficient balance
+     * @param asset Asset to supply
+     * @param amount Amount to supply
+     * @param protocol Protocol to supply to
+     * @param purchaseWithAVAX Whether to purchase with AVAX if insufficient balance
+     * @param maxSlippage Maximum slippage for purchase (in basis points)
+     * @param deadline Transaction deadline for purchase
+     */
+    function supplyWithAutoPurchase(
+        address asset,
+        uint256 amount,
+        Protocol protocol,
+        bool purchaseWithAVAX,
+        uint256 maxSlippage,
+        uint256 deadline
+    ) external payable nonReentrant whenNotPaused validAmount(asset, amount) supportedAsset(asset) validProtocol(protocol) {
+        uint256 userBalance = IERC20(asset).balanceOf(msg.sender);
+
+        if (userBalance < amount) {
+            uint256 shortfall = amount - userBalance;
+            emit InsufficientBalance(msg.sender, asset, amount, userBalance);
+
+            if (purchaseWithAVAX) {
+                require(msg.value > 0, "No AVAX provided for purchase");
+                uint256 minAmountOut = dexIntegration.calculateMinAmountOut(shortfall);
+
+                dexIntegration.buyTokenWithAVAX{value: msg.value}(
+                    asset,
+                    minAmountOut,
+                    deadline
+                );
+            } else {
+                revert("Insufficient balance and auto-purchase disabled");
+            }
+        }
+
+        // Proceed with normal supply
+        this.supply(asset, amount, protocol);
     }
 
     // ============ ADMIN FUNCTIONS ============

@@ -1,32 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // In a real implementation, these would be fetched from the smart contracts
-  // or from the protocol APIs
+  // This endpoint is deprecated - APY data should be fetched directly from smart contracts
+  // via the useProtocolAPYs hook in the frontend
   return NextResponse.json({
-    aave: {
-      supply: 5.2,
-      borrow: 7.8,
-      name: 'Aave V3',
-      description: 'Leading DeFi lending protocol',
-    },
-    morpho: {
-      supply: 6.1,
-      borrow: 7.5,
-      name: 'Morpho',
-      description: 'Optimized lending protocol',
-    },
-    benqi: {
-      supply: 5.8,
-      borrow: 8.2,
-      name: 'Benqi',
-      description: 'Native Avalanche lending protocol',
-    },
-    yieldyak: {
-      supply: 9.2,
-      borrow: 0, // YieldYak doesn't support borrowing
-      name: 'Yield Yak',
-      description: 'Yield farming aggregator',
-    },
-  });
+    error: 'This endpoint is deprecated. Use smart contract integration instead.',
+    message: 'APY data should be fetched directly from the LendingAPYAggregator contract'
+  }, { status: 410 });
 }

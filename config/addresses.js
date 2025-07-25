@@ -24,14 +24,18 @@ const addresses = {
       WBTC: "0x50b7545627a5162F82A992c33b87aDc75187B218",
       WETH: "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB",
     },
-    // Placeholder for other protocols - would need actual addresses
+    // DEX routers for asset swapping
+    dex: {
+      traderJoe: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4", // Trader Joe Router
+      pangolin: "0xE54Ca86531e17Ef3616d22Ca28b0D458b6C89106", // Pangolin Router
+    },
     morpho: {
-      // Morpho might not be deployed on Avalanche yet
+      // Morpho is not deployed on Avalanche mainnet yet
       pool: "0x0000000000000000000000000000000000000000",
     },
     yieldYak: {
-      // YieldYak strategy addresses would go here
-      // These are strategy-specific and would need to be looked up
+      // YieldYak strategy addresses - using a popular USDC strategy as example
+      usdcStrategy: "0x0000000000000000000000000000000000000000", // Would need actual strategy address
       strategies: {},
     },
   },
